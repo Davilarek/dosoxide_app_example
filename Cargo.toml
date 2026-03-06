@@ -1,0 +1,11 @@
+[package]
+name = "dosoxide_app"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+# dosoxide = { path = "../dosoxide" }
+dosoxide = { git = "https://github.com/Davilarek/dosoxide.git", branch = "main" }
+
+[lib]
+crate-type = ["staticlib"]
