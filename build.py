@@ -14,9 +14,9 @@ def run_command(cmd, cwd=None):
     executable = shutil.which(cmd[0])
     if executable is None:
         error_exit(f"Command not found: {cmd[0]}")
-    
+
     cmd_resolved = [executable] + cmd[1:]
-    
+
     try:
         subprocess.check_call(cmd_resolved, cwd=cwd)
     except subprocess.CalledProcessError as e:
@@ -24,7 +24,7 @@ def run_command(cmd, cwd=None):
 
 def get_framework_path(package_name):
     cmd = ["cargo", "metadata", "--format-version", "1"]
-    
+
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, check=True)
         metadata = json.loads(result.stdout)
@@ -59,10 +59,10 @@ def get_user_project_name():
 def find_user_lib(search_dir, pattern):
     search_path = search_dir / pattern
     files = glob.glob(str(search_path))
-    
+
     if not files:
         return None
-    
+
     return Path(files[0]).resolve()
 
 def main():
@@ -70,26 +70,31 @@ def main():
     print(f"Building project: {p}")
     PACKAGE_NAME = "dosoxide"
     LIB_PATTERN = "lib" + p + "*.a"
-    LIB_PATTERN2 = "libdosoxide-*"
-    LIB_PATTERN3 = "dosoxide*.d"
-    LIB_PATTERN4 = "lib" + p + "-*"
+    DOSOXIDE_LIB_REMOVE_PATTERN = "libdosoxide-*"
+    DOSOXIDE_BINS = "dosoxide*.d"
+    USER_LIB_REMOVE_PATTERN = "lib" + p + "-*"
+    USER_BINS_REMOVE_PATTERN = p + "-*"
     OUTPUT_NAME = "PROGRAM.EXE"
-    
+
     framework_path = get_framework_path(PACKAGE_NAME)
-    
+
     if not framework_path:
         error_exit(f"Could not find '{PACKAGE_NAME}' in dependencies.")
-    
+
     print(f"Framework found at: {framework_path}")
 
     target_spec = framework_path / "i386-dos.json"
-    
+
     deps_dir = Path("target") / "i386-dos" / "release" / "deps"
     # first we should delete the deps folder as I noticed that sometimes old builds can cause issues
     # but deleting the entire folder causes core rebuilds which is very slow, so we will just delete the files matching our pattern
-    for file in glob.glob(str(deps_dir / LIB_PATTERN2)):
+    for file in glob.glob(str(deps_dir / DOSOXIDE_LIB_REMOVE_PATTERN)):
         os.remove(file)
-    for file in glob.glob(str(deps_dir / LIB_PATTERN3)):
+    for file in glob.glob(str(deps_dir / DOSOXIDE_BINS)):
+        os.remove(file)
+    for file in glob.glob(str(deps_dir / USER_LIB_REMOVE_PATTERN)):
+        os.remove(file)
+    for file in glob.glob(str(deps_dir / USER_BINS_REMOVE_PATTERN)):
         os.remove(file)
     cargo_cmd = [
         "cargo", "+nightly", "build", "--release",
@@ -98,17 +103,17 @@ def main():
         "-Z", "json-target-spec",
         "--target", str(target_spec)
     ]
-    
+
     run_command(cargo_cmd)
 
     user_lib = find_user_lib(deps_dir, LIB_PATTERN)
-    
+
     if not user_lib:
         error_exit(f"Could not find library matching '{LIB_PATTERN}' in {deps_dir}")
 
     staging_dir = Path("staging")
     bin_dir = Path("bin")
-    
+
     staging_dir.mkdir(exist_ok=True)
     bin_dir.mkdir(exist_ok=True)
 
@@ -118,34 +123,34 @@ def main():
 
     # clang -target i386-unknown-none -c header.s -o header.o
     run_command([
-        "clang", "-target", "i386-unknown-none", 
-        "-c", str(header_s.resolve()), 
+        "clang", "-target", "i386-unknown-none",
+        "-c", str(header_s.resolve()),
         "-o", "header.o"
     ], cwd=staging_dir)
 
     # ld.lld --oformat binary -o header.bin header.o
     run_command([
-        "ld.lld", "--oformat", "binary", 
+        "ld.lld", "--oformat", "binary",
         "-o", "header.bin", "header.o"
     ], cwd=staging_dir)
 
     # clang -target i386-unknown-none -m32 -c start.s -o start.o
     run_command([
-        "clang", "-target", "i386-unknown-none", 
-        "-m32", 
-        "-c", str(start_s.resolve()), 
+        "clang", "-target", "i386-unknown-none",
+        "-m32",
+        "-c", str(start_s.resolve()),
         "-o", "start.o"
     ], cwd=staging_dir)
 
     # ld.lld -T linker.ld --oformat binary -nmagic --gc-sections -o body.bin start.o user_lib
     run_command([
-        "ld.lld", 
+        "ld.lld",
         "-T", str(linker_ld.resolve()),
         "--oformat", "binary",
         "-nmagic",
         "--gc-sections",
         "-o", "body.bin",
-        "start.o", 
+        "start.o",
         str(user_lib)
     ], cwd=staging_dir)
 
