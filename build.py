@@ -39,6 +39,23 @@ def get_framework_path(package_name):
                 return Path(manifest_path).parent
     return None
 
+def get_user_project_name():
+    cmd = ["cargo", "metadata", "--format-version", "1"]
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        metadata = json.loads(result.stdout)
+    except subprocess.CalledProcessError:
+        error_exit("Failed to run 'cargo metadata'.")
+    except json.JSONDecodeError:
+        error_exit("Failed to parse 'cargo metadata' output.")
+
+    # '.resolve.root | split("#")[0] | split("/")[-1]'
+    root_id = metadata.get("resolve", {}).get("root")
+    if not root_id:
+        error_exit("Could not find root package in cargo metadata.")
+    project_name = root_id.split("#")[0].split("/")[-1]
+    return project_name
+
 def find_user_lib(search_dir, pattern):
     search_path = search_dir / pattern
     files = glob.glob(str(search_path))
@@ -49,10 +66,13 @@ def find_user_lib(search_dir, pattern):
     return Path(files[0]).resolve()
 
 def main():
+    p = get_user_project_name()
+    print(f"Building project: {p}")
     PACKAGE_NAME = "dosoxide"
-    LIB_PATTERN = "libdosoxide_app*.a"
-    LIB_PATTERN2 = "libdosoxide*"
+    LIB_PATTERN = "lib" + p + "*.a"
+    LIB_PATTERN2 = "libdosoxide-*"
     LIB_PATTERN3 = "dosoxide*.d"
+    LIB_PATTERN4 = "lib" + p + "-*"
     OUTPUT_NAME = "PROGRAM.EXE"
     
     framework_path = get_framework_path(PACKAGE_NAME)
