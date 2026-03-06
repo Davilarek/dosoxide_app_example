@@ -51,6 +51,8 @@ def find_user_lib(search_dir, pattern):
 def main():
     PACKAGE_NAME = "dosoxide"
     LIB_PATTERN = "libdosoxide_app*.a"
+    LIB_PATTERN2 = "libdosoxide*"
+    LIB_PATTERN3 = "dosoxide*.d"
     OUTPUT_NAME = "PROGRAM.EXE"
     
     framework_path = get_framework_path(PACKAGE_NAME)
@@ -62,6 +64,13 @@ def main():
 
     target_spec = framework_path / "i386-dos.json"
     
+    deps_dir = Path("target") / "i386-dos" / "release" / "deps"
+    # first we should delete the deps folder as I noticed that sometimes old builds can cause issues
+    # but deleting the entire folder causes core rebuilds which is very slow, so we will just delete the files matching our pattern
+    for file in glob.glob(str(deps_dir / LIB_PATTERN2)):
+        os.remove(file)
+    for file in glob.glob(str(deps_dir / LIB_PATTERN3)):
+        os.remove(file)
     cargo_cmd = [
         "cargo", "+nightly", "build", "--release",
         "-Z", "build-std=core,alloc",
@@ -72,7 +81,6 @@ def main():
     
     run_command(cargo_cmd)
 
-    deps_dir = Path("target") / "i386-dos" / "release" / "deps"
     user_lib = find_user_lib(deps_dir, LIB_PATTERN)
     
     if not user_lib:
