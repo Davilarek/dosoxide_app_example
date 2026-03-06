@@ -40,21 +40,32 @@ def get_framework_path(package_name):
     return None
 
 def get_user_project_name():
-    cmd = ["cargo", "metadata", "--format-version", "1"]
+    # cmd = ["cargo", "metadata", "--format-version", "1"]
+    # try:
+    #     result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+    #     metadata = json.loads(result.stdout)
+    # except subprocess.CalledProcessError:
+    #     error_exit("Failed to run 'cargo metadata'.")
+    # except json.JSONDecodeError:
+    #     error_exit("Failed to parse 'cargo metadata' output.")
+    # # '.resolve.root | split("#")[0] | split("/")[-1]'
+    # root_id = metadata.get("resolve", {}).get("root")
+    # if not root_id:
+    #     error_exit("Could not find root package in cargo metadata.")
+    # project_name = root_id.split("#")[0].split("/")[-1]
+    # return project_name
+    # this would be the ideal way to do it but it doesn't consider that people rename their folders...
+    cargo_toml = Path("Cargo.toml")
+    if not cargo_toml.exists():
+        error_exit("Cargo.toml not found in current directory.")
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-        metadata = json.loads(result.stdout)
-    except subprocess.CalledProcessError:
-        error_exit("Failed to run 'cargo metadata'.")
-    except json.JSONDecodeError:
-        error_exit("Failed to parse 'cargo metadata' output.")
-
-    # '.resolve.root | split("#")[0] | split("/")[-1]'
-    root_id = metadata.get("resolve", {}).get("root")
-    if not root_id:
-        error_exit("Could not find root package in cargo metadata.")
-    project_name = root_id.split("#")[0].split("/")[-1]
-    return project_name
+        with open(cargo_toml, "r") as f:
+            for line in f:
+                if line.strip().startswith("name"):
+                    name = line.split("=")[1].strip().strip('"') # kinda fragile
+                    return name
+    except Exception as e:
+        error_exit(f"Failed to read Cargo.toml: {e}")
 
 def find_user_lib(search_dir, pattern):
     search_path = search_dir / pattern
